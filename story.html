@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto Stories & Evolution</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <div>
+        <h1>Crypto Stories & Evolution</h1>
+        <p>Explore the origin, major milestones, and evolution of each cryptocurrency from its earliest launch to today.</p>
+      </div>
+      <div class="page-links">
+        <a href="index.html" class="nav-link">Back to dashboard</a>
+        <button type="button" id="themeToggle" class="nav-link">Light mode</button>
+      </div>
+    </header>
+
+    <main class="story-grid">
+      <article class="story-card">
+        <h2>Bitcoin</h2>
+        <p>Bitcoin is the original digital currency, born from the 2008 whitepaper and launched in early 2009 as the first practical blockchain.</p>
+        <ul>
+          <li>2008: Satoshi Nakamoto publishes the Bitcoin whitepaper.</li>
+          <li>2009: Genesis block mined; first peer-to-peer cryptocurrency begins.</li>
+          <li>2010: First real-world transaction buys pizza for 10,000 BTC.</li>
+          <li>2013–2017: Price rallies, mainstream awareness grows, and institutional interest rises.</li>
+          <li>2021–2024: ETF approvals, broader adoption, and continued focus on Bitcoin as digital gold.</li>
+        </ul>
+      </article>
+
+      <article class="story-card">
+        <h2>Ethereum</h2>
+        <p>Ethereum introduced programmable smart contracts and decentralized applications in 2015, making blockchain much more than money.</p>
+        <ul>
+          <li>2013: Vitalik Buterin publishes the Ethereum whitepaper.</li>
+          <li>2015: Mainnet launches, enabling smart contracts and decentralized platforms.</li>
+          <li>2016: The DAO hack tests community governance and leads to the Ethereum/Classic split.</li>
+          <li>2020: DeFi and NFTs drive explosive network usage.</li>
+          <li>2022: The Merge shifts Ethereum from Proof of Work to Proof of Stake.</li>
+        </ul>
+      </article>
+
+      <article class="story-card">
+        <h2>Cardano</h2>
+        <p>Cardano focused on research-driven development, building a scalable PoS blockchain with a strong emphasis on academic review and sustainability.</p>
+        <ul>
+          <li>2017: Cardano launches with a peer-reviewed, proof-of-stake protocol called Ouroboros.</li>
+          <li>2019: Shelley upgrade introduces decentralization through staking.</li>
+          <li>2021: Smart contracts arrive with the Alonzo upgrade.</li>
+          <li>2022–2024: Growth centers on governance, scalability, and global research partnerships.</li>
+        </ul>
+      </article>
+
+      <article class="story-card">
+        <h2>Binance Coin</h2>
+        <p>Binance Coin started as the native token for the Binance exchange and evolved into a utility token across trading, fees, and the Binance Smart Chain ecosystem.</p>
+        <ul>
+          <li>2017: BNB is launched during Binance’s initial token sale.</li>
+          <li>2019: Binance Coin becomes a key fee-discount token on the Binance exchange.</li>
+          <li>2020: Binance Smart Chain launches, expanding BNB’s use cases into DeFi and NFTs.</li>
+          <li>2023: BNB remains central to transaction payments, staking, and protocol development on the BNB Chain.</li>
+        </ul>
+      </article>
+
+      <article class="story-card">
+        <h2>Solana</h2>
+        <p>Solana emerged as a high-speed blockchain for DeFi and NFTs, focusing on performance and low transaction costs while growing quickly in the early 2020s.</p>
+        <ul>
+          <li>2020: Solana mainnet launches with a novel proof-of-history consensus design.</li>
+          <li>2021: Rapid adoption driven by DeFi protocols and digital art marketplaces.</li>
+          <li>2022: Network reliability becomes a major focus as Solana handles heavy traffic and occasional outages.</li>
+          <li>2023–2024: Continued ecosystem growth around memecoins, gaming, and scaling improvements.</li>
+        </ul>
+      </article>
+    </main>
+  </div>
+  <script>
+    const themeToggle = document.getElementById('themeToggle');
+    const setTheme = theme => {
+      document.body.classList.toggle('light-theme', theme === 'light');
+      themeToggle.textContent = theme === 'light' ? 'Dark mode' : 'Light mode';
+      localStorage.setItem('siteTheme', theme);
+    };
+
+    const toggleTheme = () => {
+      const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+      setTheme(currentTheme === 'light' ? 'dark' : 'light');
+    };
+
+    const initialTheme = localStorage.getItem('siteTheme') || 'dark';
+    setTheme(initialTheme);
+    themeToggle.addEventListener('click', toggleTheme);
+  </script>
+</body>
+</html>
