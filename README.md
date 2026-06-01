@@ -13,7 +13,7 @@ A simple web app for visualizing crypto price curves, market volume, and chart v
 - Switch graph views: line, bar, area, and mixed
 - Loads in any modern web browser
 - short story of each crypto selected in this app in a second page
-- switch from dark to light-mode
+- switch from dark to light mode
 
 ## Run locally
 
