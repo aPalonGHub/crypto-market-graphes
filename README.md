@@ -1,7 +1,5 @@
 # Crypto Market Evolution App
 
-# Crypto Market Evolution App
-
 A simple web app for visualizing crypto price curves, market volume, and chart variations using CoinGecko data.
 
 ## Features
