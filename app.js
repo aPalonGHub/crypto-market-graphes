@@ -36,17 +36,54 @@ const allowedCoinIds = new Set(Object.keys(coinNames));
 const allowedRanges = new Set(Object.keys(rangeLabels));
 const allowedChartTypes = new Set(['line', 'bar', 'area', 'mixed']);
 
+const historyCache = new Map();
 let cryptoChart = null;
 let activeChartType = 'line';
+let renderQueued = false;
 
 const formatDate = timestamp => new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const isoDateKey = timestamp => new Date(timestamp).toISOString().slice(0, 10);
+
+const colorWithAlpha = (color, alpha) => {
+  if (typeof color !== 'string') return `rgba(255, 255, 255, ${alpha})`;
+
+  if (color.startsWith('rgba(')) {
+    const [red, green, blue] = color
+      .replace('rgba(', '')
+      .replace(')', '')
+      .split(',')
+      .slice(0, 3)
+      .map(part => Number.parseFloat(part.trim()));
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  if (color.startsWith('rgb(')) {
+    const [red, green, blue] = color
+      .replace('rgb(', '')
+      .replace(')', '')
+      .split(',')
+      .map(part => Number.parseFloat(part.trim()));
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  if (color.startsWith('#') && color.length === 7) {
+    const hex = color.slice(1);
+    const red = Number.parseInt(hex.slice(0, 2), 16);
+    const green = Number.parseInt(hex.slice(2, 4), 16);
+    const blue = Number.parseInt(hex.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  return `rgba(255, 255, 255, ${alpha})`;
+};
 
 const buildDataset = (data, label, color, fill = false, type = 'line') => ({
   label,
   data,
   borderColor: color,
-  backgroundColor: fill ? color.replace('1)', '0.18)') : color,
+  backgroundColor: fill ? colorWithAlpha(color, 0.18) : colorWithAlpha(color, 0.12),
   fill,
   tension: 0,
   pointRadius: 0,
@@ -76,27 +113,38 @@ const getSelectedCoins = () => Array.from(coinCheckboxes)
 async function fetchCryptoHistory(coinId, days) {
   const validatedCoinId = allowedCoinIds.has(coinId) ? coinId : 'bitcoin';
   const validatedDays = allowedRanges.has(days) ? days : '30';
-  const url = new URL(`https://api.coingecko.com/api/v3/coins/${validatedCoinId}/market_chart`);
+  const cacheKey = `${validatedCoinId}:${validatedDays}`;
 
+  if (historyCache.has(cacheKey)) {
+    return historyCache.get(cacheKey);
+  }
+
+  const url = new URL(`https://api.coingecko.com/api/v3/coins/${validatedCoinId}/market_chart`);
   url.searchParams.set('vs_currency', 'usd');
   url.searchParams.set('interval', 'daily');
   url.searchParams.set('days', validatedDays);
 
   const response = await fetch(url.href);
   if (!response.ok) throw new Error('Unable to load market data');
-  return response.json();
+
+  const data = await response.json();
+  historyCache.set(cacheKey, data);
+  return data;
 }
 
 function createChart(datasets, days, selectedCoins = []) {
-  if (cryptoChart) cryptoChart.destroy();
+  if (cryptoChart) {
+    cryptoChart.destroy();
+    cryptoChart = null;
+  }
 
   const yearRangeTicks = { '365': 12 };
   const isYearRange = yearRanges.has(days);
   const monthCount = isYearRange ? yearRangeTicks[days] : undefined;
-
   const legendTextColor = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#f4f4f8';
 
   cryptoChart = new Chart(chartCanvas, {
+    type: 'line',
     data: { datasets },
     options: {
       responsive: true,
@@ -111,13 +159,13 @@ function createChart(datasets, days, selectedCoins = []) {
             boxWidth: 12,
             padding: 14,
             usePointStyle: true,
-            generateLabels: chart => selectedCoins.map((coinId, index) => ({
+            generateLabels: () => selectedCoins.map((coinId, index) => ({
               text: coinNames[coinId] ?? coinId,
               fillStyle: coinColors[coinId] ?? '#bbb',
               strokeStyle: coinColors[coinId] ?? '#bbb',
               fontColor: legendTextColor,
               hidden: false,
-              datasetIndex: 0,
+              datasetIndex: index,
               index,
               pointStyle: 'circle',
             })),
@@ -183,6 +231,30 @@ function getChartTypeSettings(type, coinsData) {
   });
 }
 
+function buildSampleCoinData(coinId, baseDates) {
+  const priceMap = {
+    bitcoin: [36000, 37000, 36250, 37900, 38400, 39800, 39100],
+    ethereum: [2200, 2250, 2180, 2320, 2400, 2480, 2420],
+    cardano: [0.38, 0.41, 0.4, 0.44, 0.47, 0.5, 0.52],
+    binancecoin: [320, 330, 325, 338, 345, 352, 350],
+    solana: [110, 118, 120, 126, 132, 138, 140],
+  };
+
+  const volumeMap = {
+    bitcoin: [30, 27, 34, 38, 41, 39, 45],
+    ethereum: [25, 22, 28, 32, 35, 38, 40],
+    cardano: [16, 18, 17, 21, 24, 25, 27],
+    binancecoin: [12, 14, 13, 15, 18, 19, 20],
+    solana: [20, 24, 27, 30, 31, 35, 36],
+  };
+
+  return {
+    coinId,
+    prices: priceMap[coinId].map((value, index) => ({ x: baseDates[index], y: value })),
+    volumes: volumeMap[coinId].map((value, index) => ({ x: baseDates[index], y: value })),
+  };
+}
+
 async function renderChart() {
   const selectedCoins = getSelectedCoins();
   const days = rangeSelect.value;
@@ -192,8 +264,8 @@ async function renderChart() {
   updateStatus('Loading chart data...');
 
   try {
-    if (selectedCoins.length === 0) {
-      createChart([], validatedDays);
+    if (!selectedCoins.length) {
+      createChart([], validatedDays, []);
       chartSummary.textContent = '';
       selectedCoinsDisplay.textContent = 'Selected: None';
       updateStatus('No cryptocurrency selected.');
@@ -203,6 +275,7 @@ async function renderChart() {
     const allData = await Promise.all(
       selectedCoins.map(async coinId => {
         const history = await fetchCryptoHistory(coinId, validatedDays);
+
         return {
           coinId,
           prices: history.prices.map(([timestamp, value]) => ({ x: isoDateKey(timestamp), y: Number(value.toFixed(2)) })),
@@ -215,12 +288,12 @@ async function renderChart() {
       const maxPoint = current.prices[current.prices.length - 1];
       return maxPoint && maxPoint.x > last ? maxPoint.x : last;
     }, '');
+
     const lastDateLabel = lastDate ? formatDate(lastDate) : 'latest data';
-
     const datasets = getChartTypeSettings(activeChartType, allData);
-    createChart(datasets, validatedDays, selectedCoins);
+    const coinList = selectedCoins.map(coinId => coinNames[coinId]).join(', ');
 
-    const coinList = selectedCoins.map(c => coinNames[c]).join(', ');
+    createChart(datasets, validatedDays, selectedCoins);
     chartSummary.textContent = `${coinList} · ${rangeLabel} · ${lastDateLabel}`;
     selectedCoinsDisplay.textContent = `Selected: ${coinList}`;
     updateStatus(`${coinList} · ${rangeLabel} market history updated.`);
@@ -229,25 +302,24 @@ async function renderChart() {
     updateStatus('Unable to fetch crypto data. Showing sample data instead.');
 
     const sampleBaseDates = ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05', '2024-01-06', '2024-01-07'];
-    const sampleCoinsData = [
-      {
-        coinId: 'bitcoin',
-        prices: [36000, 37000, 36250, 37900, 38400, 39800, 39100].map((value, index) => ({ x: sampleBaseDates[index], y: value })),
-        volumes: [30, 27, 34, 38, 41, 39, 45].map((value, index) => ({ x: sampleBaseDates[index], y: value })),
-      },
-    ];
+    const fallbackCoins = selectedCoins.length ? selectedCoins : ['bitcoin'];
+    const sampleCoinsData = fallbackCoins.map(coinId => buildSampleCoinData(coinId, sampleBaseDates));
+    const coinList = fallbackCoins.map(coinId => coinNames[coinId]).join(', ');
 
-    if (selectedCoins.includes('ethereum')) {
-      sampleCoinsData.push({
-        coinId: 'ethereum',
-        prices: [2200, 2250, 2180, 2320, 2400, 2480, 2420].map((value, index) => ({ x: sampleBaseDates[index], y: value })),
-        volumes: [25, 22, 28, 32, 35, 38, 40].map((value, index) => ({ x: sampleBaseDates[index], y: value })),
-      });
-    }
-
-    createChart(getChartTypeSettings(activeChartType, sampleCoinsData), '30');
-    chartSummary.textContent = 'Sample data · recent 7 days';
+    createChart(getChartTypeSettings(activeChartType, sampleCoinsData), validatedDays, fallbackCoins);
+    chartSummary.textContent = `Sample data · ${rangeLabel}`;
+    selectedCoinsDisplay.textContent = `Selected: ${coinList}`;
   }
+}
+
+function scheduleRender() {
+  if (renderQueued) return;
+
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    renderChart();
+  });
 }
 
 chartButtons.forEach(button => {
@@ -255,12 +327,12 @@ chartButtons.forEach(button => {
     chartButtons.forEach(item => item.classList.remove('active'));
     button.classList.add('active');
     activeChartType = allowedChartTypes.has(button.dataset.type) ? button.dataset.type : 'line';
-    renderChart();
+    scheduleRender();
   });
 });
 
-coinCheckboxes.forEach(checkbox => checkbox.addEventListener('change', renderChart));
-rangeSelect.addEventListener('change', renderChart);
+coinCheckboxes.forEach(checkbox => checkbox.addEventListener('change', scheduleRender));
+rangeSelect.addEventListener('change', scheduleRender);
 themeToggle.addEventListener('click', toggleTheme);
 
 const initialTheme = localStorage.getItem('siteTheme') || 'dark';

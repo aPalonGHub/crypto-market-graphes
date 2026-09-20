@@ -215,7 +215,7 @@ main {
 .chart-title {
   font-size: 0.98rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--text);
 }
 
 .chart-summary {
